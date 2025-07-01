@@ -13,7 +13,7 @@ This tool converts Obsidian-style Markdown notes to rich text (RTF) documents. I
 
 ## 📸 Screenshot
 
-![[screenshot/gui1.png]]
+![screenshot of GUI](screenshot/gui1.png)
 
 ---
 
