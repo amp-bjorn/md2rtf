@@ -90,26 +90,68 @@ def modify_image_paths(md_content, filestore_path):
 # Step 3: Convert Markdown to RTF
 def convert_md_to_rtf(input_file, output_file, filestore_path):
     logger.info(f"Converting Markdown file {input_file} to RTF...")
+
     with open(input_file, 'r', encoding='utf-8') as f:
         md_content = f.read()
-    
+
+    # Normalize line endings to Unix style
+    md_content = md_content.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Remove horizontal rules (--- on their own line)
+    md_content = re.sub(r'^\s*---\s*$', '', md_content, flags=re.MULTILINE)
+
+    # Modify image paths
     modified_md_content = modify_image_paths(md_content, filestore_path)
-    
+
+    # Ensure blank lines between blocks EXCEPT between lines that are part of a table
+    lines = modified_md_content.split('\n')
+    result = []
+    prev_nonblank = False
+    in_table = False
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if '|' in line:
+            result.append(line)
+            in_table = True
+            prev_nonblank = True
+        elif stripped == '':
+            if not prev_nonblank:
+                # Skip multiple blank lines
+                continue
+            result.append('')
+            prev_nonblank = False
+            in_table = False
+        else:
+            if prev_nonblank and not in_table:
+                # Add blank line before non-table blocks
+                result.append('')
+            result.append(line)
+            prev_nonblank = True
+            in_table = False
+
+    modified_md_content = '\n'.join(result)
+
+    # Write to temp file
     temp_md_file = 'temp.md'
     with open(temp_md_file, 'w', encoding='utf-8') as f:
         f.write(modified_md_content)
-    
+
+    # Convert to RTF using Pandoc
     output = pypandoc.convert_file(temp_md_file, 'rtf', format='markdown')
-    
+
+    # Prepend RTF header
     rtf_header = r'{\rtf1\ansi\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}}{\*\generator Riched20 10.0.22621}\viewkind4\uc1 '
     output = rtf_header + output
-    
+
     with open(output_file, 'wb') as f:
         f.write(output.encode('utf-8'))
         f.write(b'\x00')
-    
+
     os.remove(temp_md_file)
     logger.info(f"RTF file created: {output_file}")
+
 
 # Step 4: Resize tables and images in RTF
 def resize_tables_and_images(rtf_content, table_width_target, image_width_target):
